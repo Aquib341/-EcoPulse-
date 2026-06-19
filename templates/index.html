@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoPulse - Carbon Footprint Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js for High-Quality Visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="container header-container">
+            <div class="logo">
+                <i class="fa-solid fa-leaf text-glow"></i> EcoPulse
+            </div>
+            <div class="gamification">
+                <span class="streak-badge" title="Your calculation streak"><i class="fa-solid fa-fire animate-pulse"></i> {{ streak }} Daily Streak</span>
+                <span class="level-badge" title="Climate Impact Level"><i class="fa-solid fa-medal"></i> Level {{ 1 + streak // 3 if streak else 1 }}</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="dashboard-grid">
+            <!-- Left Side: Advanced Input Form -->
+            <section class="card form-card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-calculator"></i> Impact Assessment</h2>
+                    <p class="subtitle">Complete all categories to calculate your exact carbon footprint.</p>
+                </div>
+                <form method="POST" action="/" id="footprint-form">
+                    
+                    <!-- Form Section: Transportation -->
+                    <div class="form-section-group">
+                        <h3 class="section-title"><i class="fa-solid fa-route"></i> Transportation</h3>
+                        <div class="form-group">
+                            <label for="mode"><i class="fa-solid fa-car-side"></i> Primary Travel Mode</label>
+                            <select name="mode" id="mode" required>
+                                <option value="car" {% if results and results.inputs.mode == 'car' %}selected{% endif %}>Passenger Car (Gasoline)</option>
+                                <option value="car_electric" {% if results and results.inputs.mode == 'car_electric' %}selected{% endif %}>Electric Vehicle (EV)</option>
+                                <option value="motorbike" {% if results and results.inputs.mode == 'motorbike' %}selected{% endif %}>Motorbike</option>
+                                <option value="bus" {% if results and results.inputs.mode == 'bus' %}selected{% endif %}>Public Bus</option>
+                                <option value="flight" {% if results and results.inputs.mode == 'flight' %}selected{% endif %}>Aviation / Flight</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="distance"><i class="fa-solid fa-road"></i> Daily Travel Distance (km)</label>
+                            <input type="number" name="distance" id="distance" min="0" max="1000" step="0.1" value="{{ results.inputs.distance if results else 15.0 }}" required>
+                        </div>
+                    </div>
+
+                    <!-- Form Section: Diet & Food -->
+                    <div class="form-section-group">
+                        <h3 class="section-title"><i class="fa-solid fa-utensils"></i> Diet & Food</h3>
+                        <div class="form-group">
+                            <label for="diet"><i class="fa-solid fa-burger"></i> Diet Composition</label>
+                            <select name="diet" id="diet" required>
+                                <option value="beef_heavy" {% if results and results.inputs.diet == 'beef_heavy' %}selected{% endif %}>Non-Vegetarian (Heavy Beef)</option>
+                                <option value="chicken" {% if results and results.inputs.diet == 'chicken' %}selected{% endif %}>Poultry / Chicken-focused</option>
+                                <option value="dairy" {% if results and results.inputs.diet == 'dairy' %}selected{% endif %}>Dairy-heavy / Vegetarian</option>
+                                <option value="vegetarian" {% if results and results.inputs.diet == 'vegetarian' %}selected{% endif %}>Balanced Vegetarian</option>
+                                <option value="vegan" {% if results and results.inputs.diet == 'vegan' %}selected{% endif %}>Plant-based Vegan</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="meals"><i class="fa-solid fa-bowl-food"></i> Meals/Day</label>
+                                <input type="number" name="meals" id="meals" min="1" max="6" value="{{ results.inputs.meals if results else 3 }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="cooking_style"><i class="fa-solid fa-store"></i> Food Prep</label>
+                                <select name="cooking_style" id="cooking_style" required>
+                                    <option value="in_store" {% if results and results.inputs.cooking_style == 'in_store' %}selected{% endif %}>In-Store / Grocery</option>
+                                    <option value="meal_kits" {% if results and results.inputs.cooking_style == 'meal_kits' %}selected{% endif %}>Meal Kit Delivery</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="food_waste"><i class="fa-solid fa-trash-arrow-up"></i> Weekly Food Waste (kg)</label>
+                            <input type="number" name="food_waste" id="food_waste" min="0" max="50" step="0.1" value="{{ results.inputs.food_waste if results else 2.0 }}" required>
+                        </div>
+                    </div>
+
+                    <!-- Form Section: Household & Energy -->
+                    <div class="form-section-group">
+                        <h3 class="section-title"><i class="fa-solid fa-house-chimney"></i> Energy & Waste</h3>
+                        <div class="form-group">
+                            <label for="electricity"><i class="fa-solid fa-bolt"></i> Monthly Electricity (kWh)</label>
+                            <input type="number" name="electricity" id="electricity" min="0" max="5000" value="{{ results.inputs.electricity if results else 350 }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="energy_source"><i class="fa-solid fa-plug"></i> Primary Energy Source</label>
+                            <select name="energy_source" id="energy_source" required>
+                                <option value="grid_avg" {% if results and results.inputs.energy_source == 'grid_avg' %}selected{% endif %}>U.S. Grid Average</option>
+                                <option value="coal" {% if results and results.inputs.energy_source == 'coal' %}selected{% endif %}>Coal-fired Grid Power</option>
+                                <option value="natural_gas" {% if results and results.inputs.energy_source == 'natural_gas' %}selected{% endif %}>Natural Gas Power</option>
+                                <option value="solar" {% if results and results.inputs.energy_source == 'solar' %}selected{% endif %}>Rooftop Solar / Clean Power</option>
+                                <option value="wind" {% if results and results.inputs.energy_source == 'wind' %}selected{% endif %}>Wind Power Agreement</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="waste"><i class="fa-solid fa-dumpster"></i> General Waste/Week (kg)</label>
+                            <input type="number" name="waste" id="waste" min="0" max="500" value="{{ results.inputs.waste if results else 8 }}" required>
+                        </div>
+                    </div>
+
+                    <!-- Form Section: Lifestyle & Goods -->
+                    <div class="form-section-group">
+                        <h3 class="section-title"><i class="fa-solid fa-basket-shopping"></i> Consumption & Lifestyle</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="clothing">Clothes/Yr</label>
+                                <input type="number" name="clothing" id="clothing" min="0" max="200" value="{{ results.inputs.clothing if results else 10 }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="furniture">Furniture/Yr</label>
+                                <input type="number" name="furniture" id="furniture" min="0" max="50" value="{{ results.inputs.furniture if results else 1 }}" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="electronics">Tech/Yr</label>
+                                <input type="number" name="electronics" id="electronics" min="0" max="50" value="{{ results.inputs.electronics if results else 2 }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="healthcare">Clinic Visits/Yr</label>
+                                <input type="number" name="healthcare" id="healthcare" min="0" max="100" value="{{ results.inputs.healthcare if results else 3 }}" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="streaming"><i class="fa-solid fa-tv"></i> Digital Streaming (hrs/day)</label>
+                            <input type="number" name="streaming" id="streaming" min="0" max="24" step="0.5" value="{{ results.inputs.streaming if results else 3.0 }}" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="calculate-btn">
+                        <span class="btn-text">Compute Eco-Impact</span>
+                        <i class="fa-solid fa-arrow-right-long"></i>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Right Side: Dashboard Results & AI Coach -->
+            {% if results %}
+            <div class="results-container">
+                
+                <!-- 1. Hero Footprint Dashboard Card -->
+                <div class="card results-hero-card">
+                    <div class="hero-header">
+                        <h2>Your Carbon Footprint</h2>
+                        <span class="badge-status">{{ "Top Emitter" if results.total_yearly_tons > 20 else "Average Emitter" if results.total_yearly_tons > 6.6 else "Eco Champion" }}</span>
+                    </div>
+                    <div class="hero-flex">
+                        <div class="hero-val-box">
+                            <span class="metric-value" id="total-yearly-tons">{{ results.total_yearly_tons }}</span>
+                            <span class="metric-unit">Tons CO₂e/yr</span>
+                        </div>
+                        <div class="hero-divider"></div>
+                        <div class="hero-val-box">
+                            <span class="metric-value-sub" id="total-monthly-kg">{{ results.total_monthly_kg }}</span>
+                            <span class="metric-unit-sub">kg CO₂e/month</span>
+                        </div>
+                    </div>
+
+                    <!-- Environmental Equivalents -->
+                    <div class="equivalents-grid">
+                        <div class="eq-item">
+                            <div class="eq-icon text-green"><i class="fa-solid fa-tree animate-float"></i></div>
+                            <div class="eq-info">
+                                <span class="eq-num" id="trees-eq-num">{{ (results.total_monthly_kg * 12 / 48) | round(0) | int }}</span>
+                                <span class="eq-label">Forest Trees Required/Yr</span>
+                            </div>
+                        </div>
+                        <div class="eq-item">
+                            <div class="eq-icon text-blue"><i class="fa-solid fa-car"></i></div>
+                            <div class="eq-info">
+                                <span class="eq-num" id="cars-eq-num">{{ (results.total_yearly_tons / 4.6) | round(1) }}</span>
+                                <span class="eq-label">Avg Cars on the Road/Yr</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Interactive Charts Section -->
+                <div class="charts-row">
+                    <div class="card chart-card">
+                        <h2><i class="fa-solid fa-chart-pie"></i> Emission Breakdown</h2>
+                        <div class="chart-wrapper">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-card">
+                        <h2><i class="fa-solid fa-chart-column"></i> Benchmark Comparison</h2>
+                        <div class="chart-wrapper">
+                            <canvas id="benchmarkChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. What-If Simulator Card -->
+                <div class="card simulator-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-sliders"></i> Advanced What-If Simulator</h2>
+                        <p class="subtitle">Simulate real-time behavioral adjustments to reduce your footprint.</p>
+                    </div>
+                    <div class="simulator-layout">
+                        <div class="sim-controls">
+                            <!-- Drive Less Slider -->
+                            <div class="sim-group">
+                                <div class="sim-label-row">
+                                    <label for="sim-drive"><i class="fa-solid fa-circle-minus"></i> Reduce Daily Travel</label>
+                                    <span class="sim-bubble"><span id="sim-drive-val">0</span>%</span>
+                                </div>
+                                <input type="range" id="sim-drive" min="0" max="100" value="0">
+                            </div>
+                            
+                            <!-- Checkboxes for Nudges -->
+                            <div class="nudge-checkboxes">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-speed-limit">
+                                    <span class="checkmark"></span>
+                                    <span>Drive at Speed Limit <small class="text-hint">(Saves 10% fuel)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-led">
+                                    <span class="checkmark"></span>
+                                    <span>Switch to LED Lighting <small class="text-hint">(Saves 500 kg CO₂e, -$200/yr)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-standby">
+                                    <span class="checkmark"></span>
+                                    <span>Unplug Standby Power <small class="text-hint">(Saves 200 kg CO₂e, -$100/yr)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-cold-wash">
+                                    <span class="checkmark"></span>
+                                    <span>Wash Laundry in Cold Water <small class="text-hint">(Saves 32 kg CO₂e/load)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-meal-kits" {% if results.inputs.cooking_style == 'meal_kits' %}checked disabled{% endif %}>
+                                    <span class="checkmark"></span>
+                                    <span>Swap Prep to Meal Kits <small class="text-hint">(33% lower food GHG)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-solar-roof">
+                                    <span class="checkmark"></span>
+                                    <span>Solar-Reflective Roof Coating <small class="text-hint">(27% cooling savings)</small></span>
+                                </label>
+                                <label class="checkbox-container">
+                                    <input type="checkbox" id="sim-furniture-refurb">
+                                    <span class="checkmark"></span>
+                                    <span>Buy Refurbished Furniture <small class="text-hint">(Saves 85% on furniture)</small></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="sim-impact-display">
+                            <h4>New Potential Footprint</h4>
+                            <div class="sim-metric">
+                                <span id="sim-total-tons">{{ results.total_yearly_tons }}</span>
+                                <small>Tons CO₂e/yr</small>
+                            </div>
+                            <div class="sim-savings-box" id="savings-box">
+                                <span class="savings-text">Estimated Annual Savings</span>
+                                <span class="savings-val" id="savings-amount">0.00 kg CO₂e</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. AI Coach Insights Panel -->
+                <div class="card ai-insights-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-robot text-glow"></i> AI Coach Action Plan</h2>
+                        <p class="subtitle">Custom scientific guidance prepared specifically for your impact levels.</p>
+                    </div>
+                    
+                    <!-- Tabs Selection -->
+                    <div class="tabs-container">
+                        <button class="tab-btn active" onclick="switchTab('quick_wins')">Quick Wins</button>
+                        <button class="tab-btn" onclick="switchTab('lifestyle_changes')">Lifestyle Changes</button>
+                        <button class="tab-btn" onclick="switchTab('systemic_actions')">Systemic Actions</button>
+                    </div>
+
+                    <!-- Tab Contents -->
+                    <div class="tab-content active" id="quick_wins">
+                        <div class="tips-grid">
+                            {% for tip in insights.quick_wins %}
+                            <div class="tip-card border-easy">
+                                <div class="tip-body">
+                                    <span class="tip-tag tag-easy">Immediate</span>
+                                    <p class="tip-text">{{ tip.action }}</p>
+                                </div>
+                                <div class="tip-meta">
+                                    <span class="meta-item"><i class="fa-solid fa-cloud-arrow-down"></i> -{{ tip.co2_savings }}</span>
+                                    <span class="meta-item"><i class="fa-solid fa-wallet"></i> {{ tip.cost_savings }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="lifestyle_changes">
+                        <div class="tips-grid">
+                            {% for tip in insights.lifestyle_changes %}
+                            <div class="tip-card border-medium">
+                                <div class="tip-body">
+                                    <span class="tip-tag tag-medium">Lifestyle</span>
+                                    <p class="tip-text">{{ tip.action }}</p>
+                                </div>
+                                <div class="tip-meta">
+                                    <span class="meta-item"><i class="fa-solid fa-cloud-arrow-down"></i> -{{ tip.co2_savings }}</span>
+                                    <span class="meta-item"><i class="fa-solid fa-wallet"></i> {{ tip.cost_savings }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="tab-content" id="systemic_actions">
+                        <div class="tips-grid">
+                            {% for tip in insights.systemic_actions %}
+                            <div class="tip-card border-expert">
+                                <div class="tip-body">
+                                    <span class="tip-tag tag-expert">Systemic</span>
+                                    <p class="tip-text">{{ tip.action }}</p>
+                                </div>
+                                <div class="tip-meta">
+                                    <span class="meta-item"><i class="fa-solid fa-cloud-arrow-down"></i> -{{ tip.co2_savings }}</span>
+                                    <span class="meta-item"><i class="fa-solid fa-wallet"></i> {{ tip.cost_savings }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Motivation Section -->
+                    <div class="coach-motivation-footer">
+                        <i class="fa-solid fa-quote-left text-muted"></i>
+                        <p class="motivational-quote">{{ insights.motivation.yearly_goal }}</p>
+                        <small class="coach-disclaimer">{{ insights.motivation.progress_tracking }}</small>
+                    </div>
+                </div>
+
+                <!-- 5. Gamification Achievements Section -->
+                <div class="card achievements-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-trophy"></i> Eco Achievements</h2>
+                        <p class="subtitle">Complete targets to unlock badges and rank up.</p>
+                    </div>
+                    <div class="achievements-grid">
+                        <!-- Paris Agreement Achiever -->
+                        <div class="badge-item {% if results.total_yearly_tons <= 2.3 %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-earth-americas"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Paris Agreement Achiever</h4>
+                                <p class="badge-desc">Rethink emissions under the 2.3 ton 2030 target.</p>
+                            </div>
+                        </div>
+                        <!-- Energy Wizard -->
+                        <div class="badge-item {% if results.inputs.energy_source in ['solar', 'wind'] or results.breakdown.energy <= 50.0 %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Energy Wizard</h4>
+                                <p class="badge-desc">Use green energy or drop monthly energy below 50 kg CO₂e.</p>
+                            </div>
+                        </div>
+                        <!-- Plant-Based Pioneer -->
+                        <div class="badge-item {% if results.inputs.diet in ['vegetarian', 'vegan'] %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-carrot"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Plant-Based Pioneer</h4>
+                                <p class="badge-desc">Adopt a meat-free vegetarian or vegan diet plan.</p>
+                            </div>
+                        </div>
+                        <!-- Walking Warrior -->
+                        <div class="badge-item {% if results.breakdown.travel <= 50.0 or results.inputs.distance == 0 %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-shoe-prints"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Walking Warrior</h4>
+                                <p class="badge-desc">Limit vehicle travel emissions to under 50 kg CO₂e/month.</p>
+                            </div>
+                        </div>
+                        <!-- Zero Waste Champion -->
+                        <div class="badge-item {% if results.inputs.food_waste <= 2.27 %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-recycle"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Waste Minimalist</h4>
+                                <p class="badge-desc">Keep weekly food waste below 2.27 kg (5 lbs).</p>
+                            </div>
+                        </div>
+                        <!-- Digital Minimalist -->
+                        <div class="badge-item {% if results.inputs.streaming <= 2.0 %}unlocked{% else %}locked{% endif %}">
+                            <div class="badge-icon"><i class="fa-solid fa-mobile-screen-button"></i></div>
+                            <div class="badge-info">
+                                <h4 class="badge-name">Digital Minimalist</h4>
+                                <p class="badge-desc">Limit digital streaming habits to under 2 hours daily.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            {% else %}
+            <!-- Welcome state for first load -->
+            <section class="results-container empty-state-container">
+                <div class="card empty-state-card text-center">
+                    <i class="fa-solid fa-globe giant-icon pulse-soft"></i>
+                    <h2>EcoPulse Dashboard</h2>
+                    <p class="empty-desc">The average U.S. per capita footprint is 17.6 tons CO₂e, while the global average is 6.6 tons. To avoid dangerous climate rise, the target is 2.3 tons.</p>
+                    <p class="empty-action">Fill out the assessment on the left to calculate your carbon footprint and receive your custom reduction roadmap.</p>
+                </div>
+            </section>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Passing backend emission breakdown and inputs to client JS -->
+    {% if results %}
+    <script>
+        window.FOOTPRINT_DATA = {{ results|tojson }};
+    </script>
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+    <script>
+        // AI Insights tabs switching logic
+        function switchTab(tabId) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active status from all tab buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab content and activate button
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>
